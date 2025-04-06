@@ -1,6 +1,6 @@
-import { desc, and, eq, isNull } from 'drizzle-orm';
+import { desc, and, eq, isNull, lt, sql } from 'drizzle-orm';
 import { db } from './drizzle';
-import { activityLogs, teamMembers, teams, users } from './schema';
+import { users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
 
@@ -33,97 +33,111 @@ export async function getUser() {
     return null;
   }
 
+  // 检查是否需要重置用量统计（每30天）
+  if (user[0].usageLastResetAt) {
+    const lastReset = new Date(user[0].usageLastResetAt);
+    const now = new Date();
+    const daysSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (daysSinceReset >= 30) {
+      await resetUserUsage(user[0].id);
+      user[0].premiumRequestsUsed = 0;
+      user[0].fastRequestsUsed = 0;
+      user[0].usageLastResetAt = now;
+    }
+  }
+
   return user[0];
 }
 
-export async function getTeamByStripeCustomerId(customerId: string) {
+// 用户基本操作
+export async function getUserById(userId: number) {
   const result = await db
     .select()
-    .from(teams)
-    .where(eq(teams.stripeCustomerId, customerId))
+    .from(users)
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .limit(1);
 
   return result.length > 0 ? result[0] : null;
 }
 
-export async function updateTeamSubscription(
-  teamId: number,
-  subscriptionData: {
-    stripeSubscriptionId: string | null;
-    stripeProductId: string | null;
-    planName: string | null;
-    subscriptionStatus: string;
+export async function getUserByEmail(email: string) {
+  const result = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.email, email), isNull(users.deletedAt)))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateUser(
+  userId: number,
+  userData: {
+    name?: string;
+    email?: string;
+    role?: string;
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
+    stripeProductId?: string | null;
+    planName?: string | null;
+    subscriptionStatus?: string | null;
   }
 ) {
   await db
-    .update(teams)
+    .update(users)
     .set({
-      ...subscriptionData,
+      ...userData,
       updatedAt: new Date(),
     })
-    .where(eq(teams.id, teamId));
+    .where(eq(users.id, userId));
 }
 
-export async function getUserWithTeam(userId: number) {
-  const result = await db
-    .select({
-      user: users,
-      teamId: teamMembers.teamId,
+// 用量统计相关操作
+export async function incrementPremiumRequests(userId: number) {
+  await db
+    .update(users)
+    .set({
+      premiumRequestsUsed: sql`${users.premiumRequestsUsed} + 1`,
+      updatedAt: new Date(),
     })
-    .from(users)
-    .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-    .where(eq(users.id, userId))
-    .limit(1);
-
-  return result[0];
+    .where(eq(users.id, userId));
 }
 
-export async function getActivityLogs() {
-  const user = await getUser();
-  if (!user) {
-    throw new Error('User not authenticated');
-  }
-
-  return await db
-    .select({
-      id: activityLogs.id,
-      action: activityLogs.action,
-      timestamp: activityLogs.timestamp,
-      ipAddress: activityLogs.ipAddress,
-      userName: users.name,
+export async function incrementFastRequests(userId: number) {
+  await db
+    .update(users)
+    .set({
+      fastRequestsUsed: sql`${users.fastRequestsUsed} + 1`,
+      updatedAt: new Date(),
     })
-    .from(activityLogs)
-    .leftJoin(users, eq(activityLogs.userId, users.id))
-    .where(eq(activityLogs.userId, user.id))
-    .orderBy(desc(activityLogs.timestamp))
-    .limit(10);
+    .where(eq(users.id, userId));
 }
 
-export async function getTeamForUser(userId: number) {
-  const result = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    with: {
-      teamMembers: {
-        with: {
-          team: {
-            with: {
-              teamMembers: {
-                with: {
-                  user: {
-                    columns: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
+export async function resetUserUsage(userId: number) {
+  await db
+    .update(users)
+    .set({
+      premiumRequestsUsed: 0,
+      fastRequestsUsed: 0,
+      usageLastResetAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+}
 
-  return result?.teamMembers[0]?.team || null;
+// 检查用户是否超出配额
+export async function isPremiumRequestsQuotaExceeded(userId: number): Promise<boolean> {
+  const user = await getUserById(userId);
+  if (!user) return true;
+  
+  return (user.premiumRequestsUsed ?? 0) >= (user.premiumRequestsLimit ?? 50);
+}
+
+// 检查用户快速请求是否超出配额
+export async function isFastRequestsQuotaExceeded(userId: number): Promise<boolean> {
+  const user = await getUserById(userId);
+  if (!user) return true;
+  
+  return (user.fastRequestsUsed ?? 0) >= (user.fastRequestsLimit ?? 150);
 }

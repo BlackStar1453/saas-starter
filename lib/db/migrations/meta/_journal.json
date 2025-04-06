@@ -8,6 +8,34 @@
       "when": 1726443359662,
       "tag": "0000_soft_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1743861794229,
+      "tag": "0001_small_maddog",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1743862447164,
+      "tag": "0002_damp_white_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1743863875408,
+      "tag": "0003_vengeful_reaper",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1743865462132,
+      "tag": "0004_milky_hawkeye",
+      "breakpoints": true
     }
   ]
 }
