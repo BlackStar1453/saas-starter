@@ -24,6 +24,12 @@ export async function createCheckoutSession({
     redirect(`/sign-up?redirect=checkout&priceId=${priceId}`);
   }
 
+  // 获取价格信息以确定支付模式
+  const price = await stripe.prices.retrieve(priceId);
+  const product = await stripe.products.retrieve(price.product as string);
+
+  const isOneTime = product.name === 'Lifetime';
+
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     line_items: [
@@ -32,15 +38,13 @@ export async function createCheckoutSession({
         quantity: 1
       }
     ],
-    mode: 'subscription',
+    mode: isOneTime ? 'payment' : 'subscription',
     success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.BASE_URL}/pricing`,
+    customer_creation: 'always',
     customer: currentUser.stripeCustomerId || undefined,
     client_reference_id: currentUser.id.toString(),
     allow_promotion_codes: true,
-    subscription_data: {
-      trial_period_days: 14
-    }
   });
 
   redirect(session.url!);
@@ -134,7 +138,7 @@ export async function handleSubscriptionChange(
     return;
   }
 
-  if (status === 'active' || status === 'trialing') {
+  if (status === 'active') {
     const plan = subscription.items.data[0]?.plan;
     await updateUser(user.id, {
       stripeSubscriptionId: subscriptionId,
@@ -152,11 +156,44 @@ export async function handleSubscriptionChange(
   }
 }
 
+export async function handleOneTimePayment(
+  session: Stripe.Checkout.Session
+) {
+  const customerId = session.customer as string;
+  
+  // 获取客户信息以找到用户邮箱
+  const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
+  
+  if (!customer || !customer.email) {
+    console.error('Customer not found or missing email:', customerId);
+    return;
+  }
+  
+  // 通过邮箱查找用户
+  const user = await getUserByEmail(customer.email);
+
+  if (!user) {
+    console.error('User not found for Stripe customer email:', customer.email);
+    return;
+  }
+
+  // 获取产品信息
+  const lineItem = (await stripe.checkout.sessions.listLineItems(session.id)).data[0];
+  const price = await stripe.prices.retrieve(lineItem.price?.id as string);
+  const product = await stripe.products.retrieve(price.product as string);
+
+  // 更新用户状态
+  await updateUser(user.id, {
+    stripeProductId: product.id,
+    planName: product.name,
+    subscriptionStatus: 'lifetime'
+  });
+}
+
 export async function getStripePrices() {
   const prices = await stripe.prices.list({
     expand: ['data.product'],
-    active: true,
-    type: 'recurring'
+    active: true
   });
 
   return prices.data.map((price) => ({
@@ -166,7 +203,8 @@ export async function getStripePrices() {
     unitAmount: price.unit_amount,
     currency: price.currency,
     interval: price.recurring?.interval,
-    trialPeriodDays: price.recurring?.trial_period_days
+    trialPeriodDays: price.recurring?.trial_period_days,
+    type: price.type
   }));
 }
 

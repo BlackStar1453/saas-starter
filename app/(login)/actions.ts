@@ -160,6 +160,7 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
         email: foundUser.email,
         name: foundUser.name,
         role: foundUser.role,
+        planName: foundUser.planName,
         premiumRequestsUsed: foundUser.premiumRequestsUsed,
         premiumRequestsLimit: foundUser.premiumRequestsLimit,
         fastRequestsUsed: foundUser.fastRequestsUsed,
@@ -250,8 +251,6 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     };
   }
 
-  let teamId: number;
-  let userRole: string;
 
   await Promise.all([
     db.insert(users).values(createdUser),
