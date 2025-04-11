@@ -1,7 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { Manrope } from 'next/font/google';
-import { UserProvider } from '@/lib/auth';
+import { UserProvider } from '@/lib/auth/index';
 import { getUser } from '@/lib/db/queries';
 
 export const metadata: Metadata = {

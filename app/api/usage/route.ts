@@ -1,98 +1,131 @@
 import { NextRequest, NextResponse } from "next/server";
-import { 
-  getUser, 
-  incrementPremiumRequests, 
-  incrementFastRequests, 
-  isPremiumRequestsQuotaExceeded,
-  isFastRequestsQuotaExceeded
-} from "@/lib/db/queries";
+import { getUserUsage } from '@/lib/usage';
+import { verifyAuth } from '@/lib/auth';
+import { db } from "@/lib/db/drizzle";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
-export async function POST(request: NextRequest) {
+// 设置允许cors
+export const cors = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const user = await getUser();
-    if (!user) {
+    // 验证认证信息
+    const authResult = await verifyAuth(req);
+    if (!authResult.success) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const { type } = await request.json();
-    
-    if (type === "premium") {
-      // 检查是否超出配额
-      const isExceeded = await isPremiumRequestsQuotaExceeded(user.id);
-      if (isExceeded) {
-        return NextResponse.json(
-          { error: "Premium requests quota exceeded" },
-          { status: 403 }
-        );
-      }
-      
-      await incrementPremiumRequests(user.id);
-      return NextResponse.json({ 
-        success: true,
-        usedCount: (user.premiumRequestsUsed || 0) + 1,
-        limit: user.premiumRequestsLimit || 50
-      });
-    } 
-    else if (type === "fast") {
-      // 检查是否超出配额
-      const isExceeded = await isFastRequestsQuotaExceeded(user.id);
-      if (isExceeded) {
-        return NextResponse.json(
-          { error: "Fast requests quota exceeded" },
-          { status: 403 }
-        );
-      }
-      
-      await incrementFastRequests(user.id);
-      return NextResponse.json({ 
-        success: true,
-        usedCount: (user.fastRequestsUsed || 0) + 1,
-        limit: user.fastRequestsLimit || 150
-      });
-    }
-    else {
+    // 验证管理员权限
+    if (authResult.role !== 'admin') {
       return NextResponse.json(
-        { error: "Invalid request type" },
+        { 
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Admin access required'
+          }
+        },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { userId } = body;
+
+    if (!userId) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'User ID is required'
+          }
+        },
         { status: 400 }
       );
     }
-  } catch (error) {
-    console.error("Error updating usage:", error);
+
+    // 重置用户使用量
+    await db
+      .update(users)
+      .set({
+        premiumRequestsUsed: 0,
+        fastRequestsUsed: 0,
+        usageLastResetAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    return NextResponse.json({
+      success: true,
+      message: 'Usage reset successfully'
+    });
+  } catch (error: any) {
+    console.error('Error in usage reset API:', error);
+    
     return NextResponse.json(
-      { error: "Failed to update usage" },
+      { 
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error'
+        }
+      },
       { status: 500 }
     );
   }
 }
 
 // 获取当前用量
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await getUser();
-    if (!user) {
+    // 验证认证信息
+    const authResult = await verifyAuth(req);
+    if (!authResult.success) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    // 获取使用量信息
+    const usage = await getUserUsage(authResult.userId);
+
     return NextResponse.json({
-      premium: {
-        used: user.premiumRequestsUsed || 0,
-        limit: user.premiumRequestsLimit || 50
-      },
-      fast: {
-        used: user.fastRequestsUsed || 0,
-        limit: user.fastRequestsLimit || 150
-      }
+      success: true,
+      data: usage
     });
-  } catch (error) {
-    console.error("Error fetching usage:", error);
+  } catch (error: any) {
+    console.error('Error in usage API:', error);
+    
+    if (error.name === 'UsageError') {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message
+          }
+        },
+        { status: error.status }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to fetch usage" },
+      { 
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error'
+        }
+      },
       { status: 500 }
     );
   }

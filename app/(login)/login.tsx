@@ -9,8 +9,22 @@ import { Label } from '@/components/ui/label';
 import { CircleIcon, Loader2 } from 'lucide-react';
 import { signIn, signUp } from './actions';
 import { ActionState } from '@/lib/auth/middleware';
+import { useEffect } from 'react';
 
-export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
+interface ExtensionAuthProps {
+  state: string | null;
+  redirectUri?: string | null;
+}
+
+export function Login({ 
+  mode = 'signin', 
+  extensionAuth,
+  onAuthSuccess
+}: { 
+  mode?: 'signin' | 'signup';
+  extensionAuth?: ExtensionAuthProps;
+  onAuthSuccess?: (result: any) => void;
+}) {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
   const priceId = searchParams.get('priceId');
@@ -20,6 +34,22 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
     { error: '' }
   );
 
+  useEffect(() => {
+    if (state && state.success && state.extensionAuth) {
+      console.log('[扩展认证] 登录组件收到认证成功响应:', state.extensionAuth);
+      
+      if (onAuthSuccess) {
+        onAuthSuccess(state);
+      }
+      
+      const redirectUrl = state.extensionAuth.redirectUrl;
+      if (redirectUrl) {
+        console.log('[扩展认证] 客户端重定向到:', redirectUrl);
+        window.location.href = redirectUrl;
+      }
+    }
+  }, [state, onAuthSuccess]);
+
   return (
     <div className="min-h-[100dvh] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -28,9 +58,14 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           {mode === 'signin'
-            ? 'Sign in to your account'
-            : 'Create your account'}
+            ? '登录您的账户'
+            : '创建新账户'}
         </h2>
+        {extensionAuth && (
+          <p className="mt-2 text-center text-sm text-gray-600">
+            登录后将自动为浏览器扩展授权
+          </p>
+        )}
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -38,12 +73,18 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
           <input type="hidden" name="redirect" value={redirect || ''} />
           <input type="hidden" name="priceId" value={priceId || ''} />
           <input type="hidden" name="inviteId" value={inviteId || ''} />
+          {extensionAuth && (
+            <input type="hidden" name="extensionAuthState" value={extensionAuth.state || ''} />
+          )}
+          {extensionAuth && (
+            <input type="hidden" name="extensionRedirectUri" value={extensionAuth.redirectUri || ''} />
+          )}
           <div>
             <Label
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email
+              邮箱
             </Label>
             <div className="mt-1">
               <Input
@@ -55,7 +96,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                 required
                 maxLength={50}
                 className="appearance-none rounded-full relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your email"
+                placeholder="请输入邮箱地址"
               />
             </div>
           </div>
@@ -65,7 +106,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
               htmlFor="password"
               className="block text-sm font-medium text-gray-700"
             >
-              Password
+              密码
             </Label>
             <div className="mt-1">
               <Input
@@ -80,7 +121,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                 minLength={8}
                 maxLength={100}
                 className="appearance-none rounded-full relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your password"
+                placeholder="请输入密码"
               />
             </div>
           </div>
@@ -98,12 +139,12 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
               {pending ? (
                 <>
                   <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                  Loading...
+                  加载中...
                 </>
               ) : mode === 'signin' ? (
-                'Sign in'
+                '登录'
               ) : (
-                'Sign up'
+                '注册'
               )}
             </Button>
           </div>
@@ -117,8 +158,8 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
             <div className="relative flex justify-center text-sm">
               <span className="px-2 bg-gray-50 text-gray-500">
                 {mode === 'signin'
-                  ? 'New to our platform?'
-                  : 'Already have an account?'}
+                  ? '还没有账户?'
+                  : '已有账户?'}
               </span>
             </div>
           </div>
@@ -131,8 +172,8 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
               className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-full shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
             >
               {mode === 'signin'
-                ? 'Create an account'
-                : 'Sign in to existing account'}
+                ? '创建新账户'
+                : '登录已有账户'}
             </Link>
           </div>
         </div>

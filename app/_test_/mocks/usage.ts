@@ -1,0 +1,1 @@
+export const checkAndUpdateUsage = jest.fn().mockResolvedValue(undefined);
