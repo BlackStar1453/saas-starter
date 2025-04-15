@@ -4,7 +4,8 @@ import { User } from '@/lib/db/schema';
 import {
   getUser,
   getUserByEmail,
-  updateUser
+  updateUser,
+  updateUserSubscription
 } from '@/lib/db/queries';
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -29,10 +30,12 @@ export async function createCheckoutSession({
   const product = await stripe.products.retrieve(price.product as string);
 
   const isOneTime = product.name === 'Lifetime';
+  
 
+  
   const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    line_items: [
+      payment_method_types: ['card'],
+      line_items: [
       {
         price: priceId,
         quantity: 1
@@ -41,11 +44,11 @@ export async function createCheckoutSession({
     mode: isOneTime ? 'payment' : 'subscription',
     success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.BASE_URL}/pricing`,
-    customer_creation: 'always',
     customer: currentUser.stripeCustomerId || undefined,
     client_reference_id: currentUser.id.toString(),
     allow_promotion_codes: true,
   });
+
 
   redirect(session.url!);
 }
@@ -140,12 +143,15 @@ export async function handleSubscriptionChange(
 
   if (status === 'active') {
     const plan = subscription.items.data[0]?.plan;
+    
+    // 首先更新用户订阅信息（计划和状态）
     await updateUser(user.id, {
       stripeSubscriptionId: subscriptionId,
       stripeProductId: plan?.product as string,
       planName: (await stripe.products.retrieve(plan?.product as string)).name,
-      subscriptionStatus: status
+      subscriptionStatus: status,
     });
+    
   } else if (status === 'canceled' || status === 'unpaid') {
     await updateUser(user.id, {
       stripeSubscriptionId: null,

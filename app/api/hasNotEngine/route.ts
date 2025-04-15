@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { checkAndUpdateUsage } from '@/lib/usage';
-import OpenAI from 'openai';
 import {Portkey} from 'portkey-ai';
 // CORS 设置
 const corsHeaders = {
@@ -21,10 +20,6 @@ export async function OPTIONS() {
     headers: corsHeaders,
   });
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -76,25 +71,37 @@ export async function POST(req: NextRequest) {
       }
     ];
 
-   /*  // 调用 OpenAI API 并使用流式响应
-    const openAICompletion = await openai.chat.completions.create({
-      model: model || 'gpt-4o-mini',
-      messages: apiMessages,
-      stream: true,
-    }); */
 
 
 
 // Construct a client with a virtual key
+
+
+const userRegion = "CN"; // 可以通过IP库或请求头判断
+const userType = authResult.plan; // 根据您的验证逻辑判断
+const modelType = "advanced";
+
+console.log(model, apiMessages, userRegion, userType, modelType);
+
 const portkey = new Portkey({
   apiKey: "D1KhOKliis1+7mQYTlao3xPfnkbf",
-  virtualKey: "deepseek-54400e"
+  config: "pc-elick-dba06f",
 })
-const completion = await portkey.chat.completions.create({
+
+
+const completion = await  portkey.chat.completions.create(
+  {
     messages: apiMessages,
     model: model || 'gpt-4o-mini',
-    stream: true,
-});
+    stream: true
+  },
+  {
+    metadata: {
+      region: userRegion,
+      userType: userType
+    },
+  },
+);
 
     // 处理流式响应
     (async () => {

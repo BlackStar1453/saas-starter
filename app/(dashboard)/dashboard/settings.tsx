@@ -21,9 +21,6 @@ export function Settings({ user }: { user: User }) {
     <section className="flex-1 p-4 lg:p-8">
       <h1 className="text-lg lg:text-2xl font-medium mb-6">Subscription</h1>
       <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Usage</CardTitle>
-        </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -72,7 +69,7 @@ export function Settings({ user }: { user: User }) {
             {/* Fast Requests 用量 */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="font-medium">gpt-4o-mini</span>
+                <span className="font-medium">Basic models</span>
                 <span className="text-sm text-muted-foreground">
                   {user.fastRequestsUsed || 0} / {user.fastRequestsLimit || 150}
                 </span>

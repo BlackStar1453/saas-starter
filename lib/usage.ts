@@ -69,12 +69,13 @@ export async function checkAndUpdateUsage(
     throw new UsageError('User not found', 'USER_NOT_FOUND', 404);
   }
 
-  // 检查是否需要重置使用量（每30天）
+  // 如果用户的计划是订阅，检查是否需要重置使用量（每30天）
   const now = new Date();
   const lastReset = user.usageLastResetAt ?? now;
   const daysSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24);
+  const isSubscription = user.subscriptionStatus === 'active';
 
-  if (daysSinceReset >= 30) {
+  if (isSubscription && daysSinceReset >= 30) {
     await db
       .update(users)
       .set({
@@ -89,15 +90,15 @@ export async function checkAndUpdateUsage(
   // 检查使用量限制
   if (type === 'premium' && (user.premiumRequestsUsed ?? 0) >= (user.premiumRequestsLimit ?? 50)) {
     throw new UsageError(
-      'Premium requests limit exceeded',
+      'Premium models limit exceeded',
       'PREMIUM_LIMIT_EXCEEDED'
     );
   }
 
   if (type === 'fast' && (user.fastRequestsUsed ?? 0) >= (user.fastRequestsLimit ?? 150)) {
     throw new UsageError(
-      'Fast requests limit exceeded',
-      'FAST_LIMIT_EXCEEDED'
+      'Basic models limit exceeded',
+      'Basic_LIMIT_EXCEEDED'
     );
   }
 

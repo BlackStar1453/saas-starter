@@ -93,6 +93,20 @@ export async function updateUser(
     .where(eq(users.id, userId));
 }
 
+// 用户订阅后，更新限制用量并且设置当前用量为0
+export async function updateUserSubscription(userId: number, subscriptionData: {
+  fastRequestsLimit: number;
+  premiumRequestsLimit: number;
+}) {
+  await db.update(users).set({
+    fastRequestsLimit: subscriptionData.fastRequestsLimit,
+    premiumRequestsLimit: subscriptionData.premiumRequestsLimit,
+    fastRequestsUsed: 0,
+    premiumRequestsUsed: 0,
+    updatedAt: new Date(),
+  }).where(eq(users.id, userId));
+}
+
 // 用量统计相关操作
 export async function incrementPremiumRequests(userId: number) {
   await db

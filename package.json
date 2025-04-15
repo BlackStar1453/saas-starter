@@ -47,7 +47,6 @@
     "lucide-react": "^0.487.0",
     "nanoid": "^5.1.5",
     "next": "15.3.0-canary.31",
-    "openai": "^4.28.0",
     "portkey-ai": "^1.8.0",
     "postcss": "^8.5.3",
     "postgres": "^3.4.5",

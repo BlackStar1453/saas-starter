@@ -25,7 +25,6 @@ const models = [
   'GPT-4:gpt-4',
   'GPT-4o:gpt-4o',
   'GPT-4o-mini:gpt-4o-mini',
-  'GPT-3.5 Turbo:gpt-3.5-turbo',
   // Deepseek 模型
   'Deepseek Chat:deepseek-chat',
   'Deepseek Coder:deepseek-coder'

@@ -5,6 +5,7 @@ import { setSession } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/payments/stripe';
 import Stripe from 'stripe';
+import { updateUserSubscription } from '@/lib/db/queries';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -105,6 +106,13 @@ if (!customerId) {
       .update(users)
       .set(updateData)
       .where(eq(users.id, user[0].id));
+
+    if (session.mode === 'subscription') {
+      await updateUserSubscription(user[0].id, {
+        fastRequestsLimit: 1000,
+        premiumRequestsLimit: 100
+      });
+    }
 
     await setSession(user[0]);
     return NextResponse.redirect(new URL('/dashboard', request.url));

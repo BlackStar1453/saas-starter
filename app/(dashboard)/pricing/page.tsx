@@ -2,14 +2,16 @@ import { checkoutAction } from '@/lib/payments/actions';
 import { Check } from 'lucide-react';
 import { getStripePrices, getStripeProducts } from '@/lib/payments/stripe';
 import { SubmitButton } from './submit-button';
+import { getUser } from '@/lib/db/queries';
 
 // Prices are fresh for one hour max
 export const revalidate = 3600;
 
 export default async function PricingPage() {
-  const [prices, products] = await Promise.all([
+  const [prices, products, currentUser] = await Promise.all([
     getStripePrices(),
     getStripeProducts(),
+    getUser(),
   ]);
 
   const premiumPlan = products.find((product) => product.name === 'Premium');
@@ -19,6 +21,12 @@ export default async function PricingPage() {
   const premiumPrice = prices.find((price) => price.productId === premiumPlan?.id);
   const plusPrice = prices.find((price) => price.productId === plusPlan?.id);
   const lifeTimePrice = prices.find((price) => price.productId === lifeTimePlan?.id);
+
+  // 确定当前用户方案
+  const userPlanName = currentUser?.planName;
+  const isLifetimeUser = userPlanName === 'Lifetime' || currentUser?.subscriptionStatus === 'lifetime';
+  const isPremiumUser = userPlanName === 'Premium' && currentUser?.subscriptionStatus === 'active';
+  const isFreeUser = !userPlanName || !currentUser?.subscriptionStatus;
 
   return (
     <main className="max-w-7xl mx-auto px-6 sm:px-9 lg:px-12 py-18">
@@ -31,6 +39,7 @@ export default async function PricingPage() {
             '100 Basic Models Queries for free',
             'No Premium Models',
           ]}
+          isCurrentPlan={isFreeUser}
         />
         <PricingCard
           name={'Premium'}
@@ -41,6 +50,7 @@ export default async function PricingPage() {
             '1000 Basic Models Queries',
           ]}
           priceId={premiumPrice?.id}
+          isCurrentPlan={isPremiumUser}
         />
         <PricingCard
           name={'One-Time'}
@@ -51,6 +61,7 @@ export default async function PricingPage() {
             'Use Your Own API Key',
           ]}
           priceId={lifeTimePrice?.id}
+          isCurrentPlan={isLifetimeUser}
         />
       </div>
     </main>
@@ -63,12 +74,14 @@ function PricingCard({
   interval,
   features,
   priceId,
+  isCurrentPlan = false,
 }: {
   name: string;
   price: number;
   interval: string;
   features: string[];
   priceId?: string;
+  isCurrentPlan?: boolean;
 }) {
   return (
     <div className="pt-6">
@@ -87,10 +100,16 @@ function PricingCard({
           </li>
         ))}
       </ul>
-      <form action={checkoutAction}>
-        <input type="hidden" name="priceId" value={priceId} />
-        <SubmitButton />
-      </form>
+      {isCurrentPlan ? (
+        <div className="inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 w-full">
+          当前方案
+        </div>
+      ) : (
+        <form action={checkoutAction}>
+          <input type="hidden" name="priceId" value={priceId} />
+          <SubmitButton />
+        </form>
+      )}
     </div>
   );
 }

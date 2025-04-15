@@ -11,6 +11,7 @@ interface SuccessAuthResult {
   success: true;
   userId: number;
   role: string;
+  plan: string;
 }
 
 interface FailureAuthResult {
@@ -68,7 +69,8 @@ log('JWT_SECRET', JWT_SECRET);
     return {
       success: true,
       userId: user.id,
-      role: user.role
+      role: user.role,
+      plan: user.planName
     };
   } catch (error) {
     console.error('Auth verification error:', error);
