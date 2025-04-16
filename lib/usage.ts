@@ -56,7 +56,7 @@ export async function getUserUsage(userId: number): Promise<UsageStatus> {
 
 export async function checkAndUpdateUsage(
   userId: number,
-  type: 'premium' | 'fast'
+  type: 'premium' | 'fast' 
 ): Promise<void> {
   const user = await db
     .select()
@@ -87,18 +87,26 @@ export async function checkAndUpdateUsage(
     return;
   }
 
+  // 映射模型类型到请求类型
+  let requestType: 'premium' | 'fast';
+  if (type === 'advanced' || type === 'premium') {
+    requestType = 'premium';
+  } else {
+    requestType = 'fast';
+  }
+
   // 检查使用量限制
-  if (type === 'premium' && (user.premiumRequestsUsed ?? 0) >= (user.premiumRequestsLimit ?? 50)) {
+  if (requestType === 'premium' && (user.premiumRequestsUsed ?? 0) >= (user.premiumRequestsLimit ?? 50)) {
     throw new UsageError(
-      'Premium models limit exceeded',
+      '高级模型使用次数已达上限',
       'PREMIUM_LIMIT_EXCEEDED'
     );
   }
 
-  if (type === 'fast' && (user.fastRequestsUsed ?? 0) >= (user.fastRequestsLimit ?? 150)) {
+  if (requestType === 'fast' && (user.fastRequestsUsed ?? 0) >= (user.fastRequestsLimit ?? 150)) {
     throw new UsageError(
-      'Basic models limit exceeded',
-      'Basic_LIMIT_EXCEEDED'
+      '基础模型使用次数已达上限',
+      'BASIC_LIMIT_EXCEEDED'
     );
   }
 
@@ -106,7 +114,7 @@ export async function checkAndUpdateUsage(
   await db
     .update(users)
     .set({
-      ...(type === 'premium'
+      ...(requestType === 'premium'
         ? { premiumRequestsUsed: (user.premiumRequestsUsed ?? 0) + 1 }
         : { fastRequestsUsed: (user.fastRequestsUsed ?? 0) + 1 }),
       updatedAt: now

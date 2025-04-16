@@ -20,14 +20,14 @@ export async function OPTIONS() {
 }
 
 // 定义模型列表
-const models = [
+export const models = [
   // OpenAI 模型
-  'GPT-4:gpt-4',
-  'GPT-4o:gpt-4o',
-  'GPT-4o-mini:gpt-4o-mini',
+  { name: 'GPT-4', id: 'gpt-4', modelType: 'premium' },
+  { name: 'GPT-4o', id: 'gpt-4o', modelType: 'premium' },
+  { name: 'GPT-4o-mini', id: 'gpt-4o-mini', modelType: 'fast' },
   // Deepseek 模型
-  'Deepseek Chat:deepseek-chat',
-  'Deepseek Coder:deepseek-coder'
+  { name: 'Deepseek Chat', id: 'deepseek-chat', modelType: 'premium' },
+  { name: 'Deepseek Coder', id: 'deepseek-coder', modelType: 'premium' }
 ];
 
 export async function GET(req: NextRequest) {
@@ -41,11 +41,18 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 为前端格式化模型列表
+    const formattedModels = models.map(model => ({
+      label: model.name,
+      value: model.id,
+      modelType: model.modelType
+    }));
+
     // 返回模型列表
     return NextResponse.json(
       {
         success: true,
-        message: models
+        message: formattedModels
       },
       { status: 200, headers: corsHeaders }
     );

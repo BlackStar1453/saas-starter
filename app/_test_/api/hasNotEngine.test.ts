@@ -110,4 +110,54 @@ describe('hasNotEngine API', () => {
     expect(data.success).toBe(false);
     expect(data.error.code).toBe('USAGE_LIMIT_EXCEEDED');
   });
+
+  // 添加一个测试来检测API响应时间
+  test('API响应性能测试', async () => {
+    // 1. 使用更简洁的mock流
+    const mockStream = {
+      [Symbol.asyncIterator]: async function* () {
+        yield { choices: [{ delta: { content: '测试' } }] };
+      }
+    };
+    
+    // 2. 使用统一的mock方式
+    function createReadableStreamFromData(chunks: string[]) {
+      return new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(new TextEncoder().encode(chunk));
+          }
+          controller.close();
+        }
+      });
+    }
+    
+    // 3. 使用 Response 构造函数创建有效的响应对象
+    jest.spyOn(global, 'fetch').mockImplementation(() => 
+      Promise.resolve(
+        new Response(
+          createReadableStreamFromData(['data: {"choices":[{"delta":{"content":"测试"}}]}\n\n']),
+          {
+            headers: {'content-type': 'text/event-stream'},
+            status: 200
+          }
+        )
+      )
+    );
+    
+    // 4. 记录API响应时间
+    const startTime = Date.now();
+    const req = new NextRequest('http://localhost:3000/api/hasNotEngine', {
+      method: 'POST',
+      body: JSON.stringify({
+        query: '你好，世界'
+      })
+    });
+    const response = await POST(req);
+    const responseTime = Date.now() - startTime;
+    
+    // 5. 确保验证正确的响应格式
+    expect(response.status).toBe(200);
+    expect(responseTime).toBeLessThan(500);
+  });
 });
